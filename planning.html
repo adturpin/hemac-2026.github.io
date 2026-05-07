@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEMAC Dijon 2026 – Mon Planning</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#111827;color:#e2e8f0;min-height:100vh}
+h1{text-align:center;padding:18px 16px 4px;color:#f59e0b;font-size:1.5em;letter-spacing:2px}
+.subtitle{text-align:center;color:#94a3b8;font-size:.85em;padding:2px 0 14px}
+
+/* TABS */
+.tabs{display:flex;justify-content:center;gap:6px;padding:0 12px 14px;flex-wrap:wrap}
+.tab{padding:9px 22px;border-radius:6px;cursor:pointer;font-weight:600;font-size:.85em;border:2px solid #f59e0b44;color:#f59e0b;background:transparent;transition:all .2s}
+.tab.active,.tab:hover{background:#f59e0b;color:#111827}
+
+/* OUTER LAYOUT */
+.main{display:flex;max-width:1900px;margin:0 auto;height:calc(100vh - 120px)}
+.schedule{flex:1;min-width:0;overflow:auto}
+.sidebar{width:280px;min-width:280px;padding:14px;overflow-y:auto;background:#0f172a;border-left:1px solid #1e293b}
+
+/* DAY */
+.day{display:none}.day.active{display:block}
+
+/* ── AGENDA ─────────────────────────────────────── */
+
+/* Sticky header row: empty gutter + room names */
+.agenda-header{display:flex;position:sticky;top:0;z-index:30;background:#111827;border-bottom:2px solid #334155;padding-bottom:0}
+.ah-gutter{width:52px;flex-shrink:0;border-right:1px solid #334155}
+.ah-rooms{display:flex;flex:1;min-width:0}
+.ah-room{flex:1;min-width:120px;text-align:center;padding:7px 4px;font-size:.63em;font-weight:700;color:#cbd5e1;border-right:1px solid #334155;line-height:1.3}
+
+/* Body: gutter + event canvas */
+.agenda-body{display:flex}
+.time-gutter{width:52px;flex-shrink:0;position:relative;border-right:1px solid #334155}
+.tick{position:absolute;right:6px;font-size:.66em;color:#94a3b8;transform:translateY(-50%);white-space:nowrap;line-height:1;font-weight:600}
+.tick::after{content:'';position:absolute;left:calc(100% + 3px);top:50%;width:6px;height:1px;background:#475569}
+
+/* Event canvas */
+.cols-area{flex:1;position:relative;min-width:0}
+.hlines{position:absolute;inset:0;pointer-events:none;z-index:1}
+.hline{position:absolute;left:0;right:0;height:1px;background:#1e293b}
+.hline.bold{background:#334155}
+
+/* Notice bands */
+.nband{position:absolute;left:0;right:0;z-index:2;display:flex;align-items:center;padding:0 10px;gap:8px;font-size:.72em;pointer-events:none;overflow:hidden;font-weight:500}
+.nband.meal{background:#0d1f1f;border-top:1px solid #0f766e;border-bottom:1px solid #0f766e;color:#2dd4bf}
+.nband.special{background:#1c1a08;border-top:1px solid #b45309;border-bottom:1px solid #b45309;color:#fbbf24}
+.nband.normal{background:#131e2e;border-top:1px solid #334155;border-bottom:1px solid #334155;color:#94a3b8}
+.nband .nt{font-weight:700;white-space:nowrap;flex-shrink:0;opacity:.9}
+
+/* Room columns */
+.room-cols{display:flex;position:absolute;inset:0;z-index:3}
+.room-col{flex:1;min-width:120px;position:relative;border-right:1px solid #1e293b}
+
+/* Event blocks */
+.eblock{position:absolute;left:3px;right:3px;border-radius:6px;overflow:hidden;transition:filter .15s,box-shadow .15s}
+
+/* Selectable card blocks */
+.eblock.card{cursor:pointer;border:2px solid transparent;z-index:5}
+.eblock.card:hover{filter:brightness(1.2);z-index:20}
+.eblock.card.selected{border-color:#fff!important;box-shadow:0 0 0 2px #ffffff22,0 4px 20px #0008;z-index:10}
+.eblock.card.conflict{border-color:#ef4444!important;box-shadow:0 0 0 2px #ef444444!important}
+.eblock.card .c-instr{font-size:.76em;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.eblock.card .c-ttl{font-size:.69em;line-height:1.3;color:#e2e8f0;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.eblock.card .c-tags{display:flex;gap:3px;flex-wrap:wrap}
+.weapon-tag,.lvl-tag{font-size:.6em;padding:1px 5px;border-radius:8px;background:#ffffff28;font-weight:600;color:#fff}
+.eblock.card .badge{position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fff;color:#111;font-size:.62em;display:none;align-items:center;justify-content:center;font-weight:900}
+.eblock.card.selected .badge{display:flex}
+.eblock.card-inner{padding:7px 9px;height:100%}
+
+/* Tooltip */
+.eblock.card[data-desc]:hover::after{content:attr(data-desc);position:absolute;left:0;bottom:calc(100% + 5px);z-index:200;background:#0f172a;border:1px solid #f59e0b44;padding:8px 10px;border-radius:6px;font-size:.7em;width:260px;white-space:normal;line-height:1.45;pointer-events:none;color:#cbd5e1;box-shadow:0 6px 24px #000a;text-overflow:initial;-webkit-line-clamp:initial;overflow:initial;display:block}
+
+/* Conference blocks */
+.eblock.conf{background:#1e293b;border:1px solid #f59e0b33;z-index:4;padding:6px 8px}
+.conf .cb-badge{font-size:.58em;font-weight:800;color:#f59e0b;letter-spacing:1px;margin-bottom:3px}
+.conf .cb-ttl{color:#f59e0b;font-size:.72em;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.conf .cb-sub{color:#64748b;font-size:.65em;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Free sparring filler */
+.eblock.sparring{background:#0d1b2e;border:1px solid #1e3a5f55;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.sparring .sp-i{font-size:1.1em;opacity:.25}
+.sparring .sp-l{color:#4a7aa8;font-size:.6em;font-weight:700;text-align:center;margin-top:4px;line-height:1.4;letter-spacing:.3px}
+
+/* WEAPON COLORS */
+.el{background:linear-gradient(160deg,#1d4ed8,#1e3a8a)}
+.rapiere{background:linear-gradient(160deg,#4c1d95,#2e1065)}
+.messer{background:linear-gradient(160deg,#7f1d1d,#450a0a)}
+.sabre{background:linear-gradient(160deg,#7c2d12,#431407)}
+.lutte{background:linear-gradient(160deg,#14532d,#052e16)}
+.baton{background:linear-gradient(160deg,#3d3a0a,#1a1a02)}
+.couteau{background:linear-gradient(160deg,#6b2e12,#3b1c08)}
+.bocle{background:linear-gradient(160deg,#1e3a5f,#0c2340)}
+.multi{background:linear-gradient(160deg,#3730a3,#1e1b4b)}
+.gaulois{background:linear-gradient(160deg,#6b3a1f,#3b2108)}
+.boxe{background:linear-gradient(160deg,#6b21a8,#3b0764)}
+.dague{background:linear-gradient(160deg,#1e3a5f,#0f2a4a)}
+.faucille{background:linear-gradient(160deg,#065f46,#04261b)}
+.faux{background:linear-gradient(160deg,#064e3b,#042d1a)}
+.arc{background:linear-gradient(160deg,#365314,#1a3209)}
+.canne{background:linear-gradient(160deg,#503a10,#2d2006)}
+
+/* SIDEBAR */
+.sidebar h2{color:#f59e0b;font-size:.95em;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid #1e293b}
+.sel-count{font-size:.75em;color:#64748b;margin-bottom:8px}
+.sel-list{list-style:none}
+.sel-item{padding:7px 8px;margin-bottom:5px;border-radius:5px;font-size:.75em;border-left:3px solid #f59e0b;background:#1e293b}
+.sel-item .si-day{color:#64748b;font-size:.85em}
+.sel-item .si-time{color:#f59e0b;font-weight:700}
+.sel-item .si-name{font-weight:600;margin:2px 0}
+.sel-item .si-instr{color:#94a3b8}
+.sel-item.conflict-item{border-left-color:#ef4444;background:#2d1515}
+.conflict-warn{color:#f87171;font-size:.72em;margin-top:2px}
+.empty-msg{color:#475569;font-size:.8em;text-align:center;padding:18px 0}
+.btn-clear{width:100%;margin-top:10px;padding:7px;background:#2d1515;border:1px solid #ef4444;color:#fca5a5;border-radius:5px;cursor:pointer;font-size:.78em}
+.btn-clear:hover{background:#3d2020}
+.btn-print{width:100%;margin-top:6px;padding:7px;background:#132010;border:1px solid #16a34a;color:#86efac;border-radius:5px;cursor:pointer;font-size:.78em}
+.btn-print:hover{background:#1a2d16}
+.legend{margin-top:14px;border-top:1px solid #1e293b;padding-top:10px}
+.legend h3{font-size:.72em;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+.leg-item{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:.7em;color:#94a3b8}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:#000000bb;z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:#1e293b;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px #0009;border:1px solid #334155}
+.modal-head{padding:18px 20px 14px;border-bottom:1px solid #334155;position:relative}
+.modal-head .m-weapon{font-size:.65em;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;margin-bottom:8px}
+.modal-head h3{font-size:1.1em;font-weight:800;line-height:1.4;color:#ffffff;margin-bottom:10px;padding-right:44px}
+.modal-head .m-meta{display:flex;flex-wrap:wrap;gap:6px}
+.m-tag{font-size:.68em;padding:3px 9px;border-radius:10px;background:#0f172a;font-weight:600;color:#94a3b8}
+.m-tag.instr{color:#f59e0b;border:1px solid #f59e0b33}
+.m-tag.room{color:#38bdf8;border:1px solid #38bdf844}
+.m-tag.time{color:#a78bfa;border:1px solid #a78bfa33}
+.m-tag.lvl{color:#86efac;border:1px solid #86efac33}
+.modal-body{padding:16px 20px 20px}
+.modal-body .m-desc{font-size:.82em;color:#cbd5e1;line-height:1.6}
+.modal-body .m-equip{margin-top:12px;font-size:.78em;color:#94a3b8;border-top:1px solid #334155;padding-top:10px}
+.modal-body .m-equip strong{color:#f59e0b;font-size:.9em}
+.modal-close{position:absolute;top:10px;right:10px;background:#334155;border:none;color:#cbd5e1;font-size:1em;cursor:pointer;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.modal-close:hover{background:#ef4444;color:#fff}
+.modal-select{width:100%;margin-top:14px;padding:9px;border-radius:7px;cursor:pointer;font-size:.82em;font-weight:700;border:none;transition:filter .15s}
+.modal-select.add{background:#f59e0b;color:#111}
+.modal-select.remove{background:#2d1515;color:#fca5a5;border:1px solid #ef4444}
+.modal-select:hover{filter:brightness(1.1)}
+.detail-btn{position:absolute;bottom:5px;right:5px;background:#ffffff22;border:1px solid #ffffff55;color:#fff;font-size:.62em;padding:3px 8px;border-radius:4px;cursor:pointer;z-index:20;font-weight:700;letter-spacing:.3px;backdrop-filter:blur(2px)}
+.detail-btn:hover{background:#f59e0b;border-color:#f59e0b;color:#111}
+
+/* FILTER BAR */
+.filter-bar{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 12px 12px;flex-wrap:wrap}
+.filter-bar label{font-size:.72em;color:#64748b;white-space:nowrap;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.f-select{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:5px 10px;border-radius:6px;font-size:.78em;cursor:pointer;min-width:155px;transition:border-color .15s}
+.f-select:focus{outline:none;border-color:#f59e0b}
+.f-select.active{border-color:#f59e0b;color:#f59e0b}
+.f-reset{background:transparent;border:1px solid #334155;color:#64748b;padding:5px 12px;border-radius:6px;font-size:.78em;cursor:pointer;transition:all .15s;white-space:nowrap}
+.f-reset:hover{border-color:#ef4444;color:#ef4444}
+.f-count{font-size:.72em;color:#94a3b8;padding:0 4px;min-width:80px}
+.f-input{min-width:200px}
+.f-input::placeholder{color:#475569}
+.eblock.card.faded{opacity:0.1;filter:grayscale(1);pointer-events:none}
+
+@page{size:A4 landscape;margin:8mm}
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body{margin:0;background:#111827!important}
+  h1,.subtitle,.tabs,.filter-bar,.sidebar,.modal-bg,.detail-btn,.badge{display:none!important}
+  .main{height:auto!important;display:block!important}
+  .schedule{overflow:visible!important}
+  .agenda-header{position:relative!important;top:auto!important}
+
+  /* 1 jour = 1 page */
+  .day{
+    display:block!important;
+    zoom:0.65;
+    break-after:page;
+    page-break-after:always;
+  }
+  .day:last-child{break-after:avoid;page-break-after:avoid}
+
+  /* Couleur uniquement pour les sessions sélectionnées */
+  .eblock.card:not(.selected){
+    background:#ffffff!important;
+    border:1px solid #94a3b8!important;
+  }
+  .eblock.card:not(.selected) .c-instr{color:#0f172a!important}
+  .eblock.card:not(.selected) .c-ttl{color:#334155!important}
+  .eblock.card:not(.selected) .weapon-tag,
+  .eblock.card:not(.selected) .lvl-tag{background:#e2e8f0!important;color:#334155!important}
+
+  /* Sessions sélectionnées : couleur conservée + bordure dorée */
+  .eblock.card.selected{border:2px solid #f59e0b!important}
+
+  /* Ateliers filtrés : visibles à l'impression */
+  .eblock.card.faded{opacity:1!important;filter:none!important}
+}
+</style>
+</head>
+<body>
+<h1>⚔ HEMAC DIJON 2026 ⚔</h1>
+<p class="subtitle">23<sup>es</sup> Rencontres Internationales d'AMHE · 14–17 mai 2026 · Campus universitaire de Dijon</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="showDay('jeudi')">Jeudi 14 mai</button>
+  <button class="tab" onclick="showDay('vendredi')">Vendredi 15 mai</button>
+  <button class="tab" onclick="showDay('samedi')">Samedi 16 mai</button>
+  <button class="tab" onclick="showDay('dimanche')">Dimanche 17 mai</button>
+</div>
+
+<div class="filter-bar">
+  <label>Discipline</label>
+  <select class="f-select" id="f-discipline" onchange="applyFilters()">
+    <option value="">Toutes</option>
+  </select>
+  <label>Niveau</label>
+  <select class="f-select" id="f-niveau" onchange="applyFilters()">
+    <option value="">Tous</option>
+    <option value="Débutant">Débutant</option>
+    <option value="Intermédiaire">Intermédiaire</option>
+    <option value="Intermédiaire+">Intermédiaire+</option>
+    <option value="Confirmé">Confirmé</option>
+  </select>
+  <label>Instructeur</label>
+  <input class="f-select f-input" type="text" id="f-instructeur" list="instructeur-list" placeholder="Rechercher un instructeur…" onchange="applyFilters()" autocomplete="off">
+  <datalist id="instructeur-list"></datalist>
+  <button class="f-reset" onclick="resetFilters()">✕ Réinitialiser</button>
+  <span class="f-count" id="f-count"></span>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="m-weapon" id="m-weapon"></div>
+      <h3 id="m-title"></h3>
+      <div class="m-meta">
+        <span class="m-tag instr" id="m-instr"></span>
+        <span class="m-tag room" id="m-room"></span>
+        <span class="m-tag time" id="m-time"></span>
+        <span class="m-tag lvl" id="m-lvl"></span>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="m-desc" id="m-desc"></div>
+      <button class="modal-select" id="m-select-btn" onclick="toggleFromModal()"></button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+<div class="schedule" id="schedule"></div>
+<div class="sidebar">
+  <h2>🗓 Mon Planning</h2>
+  <div class="sel-count" id="sel-count">0 atelier(s) sélectionné(s)</div>
+  <ul class="sel-list" id="sel-list"><li class="empty-msg">Clique sur un atelier pour l'ajouter</li></ul>
+  <button class="btn-clear" onclick="clearAll()">✕ Tout effacer</button>
+  <button class="btn-print" onclick="window.print()">🖨 Imprimer</button>
+  <div class="legend"><h3>Disciplines</h3><div id="legend"></div></div>
+</div>
+</div>
+
+<script>
+// ─── WORKSHOPS ───────────────────────────────────────────────────────────────
+const WORKSHOPS = [
+
+// ══ JEUDI 14 MAI ══
+
+{id:'J_TR',day:'jeudi',slot:'J1',time:'14h15–18h00',room:'SM',instructor:'',
+ title:'Table ronde – « Les clips de Maîtres d\'Armes »',
+ weapon:'',css:'',level:'',type:'c',
+ desc:'Table ronde délocalisée en Salle de Conférence (Maison des Étudiants). Fin prévue à 17h.'},
+
+{id:'J01',day:'jeudi',slot:'J1',time:'14h15–16h00',room:'SC',instructor:'João Oliveira',
+ title:'La dague dans l\'épée – Une évolution dans l\'art de Fiore',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Axé sur les techniques du poignard rondel, cet atelier explore comment les techniques du poignard sont utilisées comme base pour les techniques de l\'épée d\'armes et de l\'épée longue dans le système de Fiore. Matériel : épée ou épée longue, gants légers et coquille.'},
+
+{id:'J02',day:'jeudi',slot:'J1',time:'14h15–16h00',room:'ZA',instructor:'Alexey Rodriguez Blanter',
+ title:'Viens me chercher, mon pote !',
+ weapon:'Épée longue',css:'el',level:'Intermédiaire+',type:'a',
+ desc:'Transformer les vulnérabilités de sa position en appât conscient pour anticiper la direction de l\'attaque adverse et gagner du temps de réaction. Matériel : équipement complet haut du corps recommandé.'},
+
+{id:'J03',day:'jeudi',slot:'J1',time:'14h15–16h00',room:'ZB',instructor:'Emilia Skirmuntt',
+ title:'Pas de règles, seulement du talent : le couteau et le tomahawk',
+ weapon:'Couteau & Tomahawk',css:'couteau',level:'Débutant',type:'a',
+ desc:'Deux armes des 18e–19e siècles : tomahawk et couteau Bowie. Contexte historique, sources et reconstruction, fonctionnement individuel et en système jumelé. Contrôle de la distance, timing, structure et adaptabilité en combat rapproché. Matériel : masque, gants légers. Tomahawk et couteau Bowie si possession (certains fournis).'},
+
+{id:'J04',day:'jeudi',slot:'J1',time:'14h15–16h00',room:'ZC',instructor:'Bastian Koppenhöfer',
+ title:'Problèmes de poussée – ou comment aborder le sujet',
+ weapon:'Messer',css:'messer',level:'Débutant',type:'a',
+ desc:'Se faire poignarder au visage n\'est pas agréable. Dans cet atelier, nous examinerons les moyens d\'éviter d\'être poignardé en escrime au Messer. Nous essaierons des méthodes éprouvées et en explorerons de nouvelles. Matériel : Messer, gants, masque.'},
+
+{id:'J05',day:'jeudi',slot:'J1',time:'14h15–16h00',room:'ZD',instructor:'Marc Dekker',
+ title:'Combattre avec la faux des fermiers',
+ weapon:'Faux (Mair)',css:'faux',level:'Débutant',type:'a',
+ desc:'Techniques décrites dans l\'Arte Atletica de Paulus Hector Mair pour la faux des fermiers : maniement et déplacements avec cette arme peu commune. Matériel : gants légers, masque facultatif.'},
+
+{id:'J06',day:'jeudi',slot:'J2',time:'16h15–18h00',room:'SC',instructor:'Willeke Snijder',
+ title:'Le combat à la Faucille selon Paulus Hector Mair',
+ weapon:'Faucille',css:'faucille',level:'Débutant',type:'a',
+ desc:'Exploration des possibilités de la faucille (seul maître à l\'avoir traitée dans son Opus Amplissimum). Similitudes avec d\'autres armes, extension des 16 illustrations connues. Matériel : gants couvrant mains et poignets obligatoires. Masque fortement recommandé. Faucilles d\'entraînement fournies.'},
+
+{id:'J07',day:'jeudi',slot:'J2',time:'16h15–18h00',room:'ZA',instructor:'Filipe Martins',
+ title:'Deux épées, deux fois plus de plaisir ! – Règles selon Godinho',
+ weapon:'Rapière / Sidesword',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Atelier couvrant les règles du combat à deux épées tirées de l\'Arte de Esgrima (1599) de Domingos Luis Godinho : mécanismes fondamentaux, scénarios complexes avec plusieurs adversaires. Matériel : deux rapières ou épées courtes ou bâtons ; gants et masque recommandés.'},
+
+{id:'J08',day:'jeudi',slot:'J2',time:'16h15–18h00',room:'ZB',instructor:'Jérémie Gueben',
+ title:'L\'Escrime des Roys – Tir du Roy',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Découverte du Tir du Roy, forme de tournoi historique des Serments d\'escrimeurs. Introduction sur les Serments, leurs origines, leurs règles. Organisation d\'un Tir du Roy. Atelier non technique : objectif = vous donner les clés pour organiser votre propre tir en club. Matériel : équipement complet, vestes de couleurs foncées uniquement (lames recouvertes de craie blanche).'},
+
+{id:'J09',day:'jeudi',slot:'J2',time:'16h15–18h00',room:'ZC',instructor:'Dominik Petermann',
+ title:'Un aperçu du Spadroon de Donald McBane',
+ weapon:'Spadroon / Sabre',css:'sabre',level:'Débutant',type:'a',
+ desc:'Dans cet atelier, nous étudierons l\'art du spadroon à l\'aide du manuel Expert Swordsman\'s Companion de Donald McBane. Nous aborderons la personnalité de McBane et ses techniques de spadroon, applicables à l\'escrime au sabre. Matériel : masque, gants, gorgerin, plastron, sabre/spadroon.'},
+
+{id:'J10',day:'jeudi',slot:'J2',time:'16h15–18h00',room:'ZD',instructor:'Ken Renaud Dietiker',
+ title:'La Reine de Bataille (bâton de combat à l\'épieu ailé)',
+ weapon:'Arme d\'hast',css:'baton',level:'Intermédiaire+',type:'a',
+ desc:'Démonstration de la dynamique et de la polyvalence de l\'arme d\'hast courte, bien au-delà d\'une simple lance à pique. Exercices solo et duo. Matériel : bâton ~1,80–1,90m max. Armes à lame synthétiques obligatoires. Masque et gants obligatoires.'},
+
+// ══ VENDREDI 15 MAI ══
+
+{id:'V01',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'SM',instructor:'Garance Psalmon & Pauline Paiva Pereira da Sousa',
+ title:'Auto-défense féminine, une réappropriation de la violence',
+ weapon:'Lutte / Self-défense',css:'lutte',level:'Débutant',type:'a',
+ desc:'Contexte historique de l\'appropriation du Jiu-Jitsu par les femmes au XIXe siècle en Europe. Panel de techniques de défense basé sur des sources d\'époque. Matériel : vêtements confortables.'},
+
+{id:'V02',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'ZA',instructor:'Emilia Skirmuntt',
+ title:'Introduction aux techniques de demi-coup de lame de Fiore',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Principes et techniques de la prise de lame à deux mains (half-blading, mezza spada) de Fiore dei Liberi. Contexte historique, applications dans le combat en armure, mécanismes pour exécuter ces techniques en sécurité. Matériel : épée longue, gants, masque.'},
+
+{id:'V03',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'ZB',instructor:'Marco De Filippo',
+ title:'Marozzo contre l\'Anonyme : épées et rotelles – Partie 1',
+ weapon:'Sidesword & Rotella',css:'rapiere',level:'Intermédiaire',type:'a',
+ desc:'Aperçu de l\'art de l\'épée et de la rotelle : concepts fondamentaux et techniques des maîtres de la tradition bolonaise (Marozzo, Manciolino, Anonimo). Matériel : masque, gants. Idéal : + veste, protège-tibias.'},
+
+{id:'V04',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'ZC',instructor:'Rui Ferreira',
+ title:'Le point de vue de Senese',
+ weapon:'Rapière',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Présentation des écrits et de l\'approche de Senese : définitions du poids, de la mesure, des lignes, de la perspective, du tempo indivisible, et sa fente caractéristique. Matériel : veste, masque, gants légers, rapière.'},
+
+{id:'V05',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'ZD',instructor:'Jeff Tsay',
+ title:'Krumphau : l\'éléphant dans la pièce',
+ weapon:'Épée longue',css:'el',level:'Intermédiaire',type:'a',
+ desc:'Analyse théorique et pratique complète du Krumphau (coup tordu). Définition mécanique et tactique, méthodes d\'entraînement progressives, liens avec les références de Liechtenauer. Matériel : épée longue, masque, gants (équipement complet bienvenu).'},
+
+{id:'V06',day:'vendredi',slot:'V1',time:'9h30–10h55',room:'ZG',instructor:'Régis Harter',
+ title:'Lance la javeline comme un guerrier Gaulois !',
+ weapon:'Gaulois – Javeline',css:'gaulois',level:'Débutant',type:'a',
+ desc:'Atelier centré sur le fun. Lancer de javelines sur cible, analyses de l\'objet et de son usage, recherche du champion ! Matériel : fourni.'},
+
+{id:'V07',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'SM',instructor:'Rob Runacres',
+ title:'CONFÉRENCE – L\'éducation martiale de Louis XIII',
+ weapon:'Conférence',css:'',level:'Tous',type:'c',
+ desc:'Éducation martiale du dauphin Louis de Bourbon (futur Louis XIII). Armes enseignées, méthodes d\'enseignement, et la question : un prince apprenait-il à tuer ou à faire bonne figure ?'},
+
+{id:'V08',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'SC',instructor:'Predrag Nikolic',
+ title:'Lutte en rond',
+ weapon:'Lutte (Ringen)',css:'lutte',level:'Débutant',type:'a',
+ desc:'Techniques du manuel de lutte de Fabian von Auerswald (1539), applicables au jeu de lutte en rond. Des bases aux techniques avancées selon le niveau des participants. Matériel : protège-dent, coquille, veste robuste.'},
+
+{id:'V09',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'ZA',instructor:'Isobel Zijlstra',
+ title:'Tenez ma moustache – Sabre à l\'Académie Theresian (1886)',
+ weapon:'Sabre',css:'sabre',level:'Débutant',type:'a',
+ desc:'Système Austro-Hongrois Prime pour le sabre selon le Major Josef Feldmann. Approche par jeux et exercices compétitifs pour explorer les bases d\'un système militaire efficace. Matériel : masque, protège-cou, protège-poitrine, protège-coudes, gants. Veste recommandée.'},
+
+{id:'V10',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'ZB',instructor:'Marco De Filippo',
+ title:'Marozzo contre l\'Anonyme : épées et rotelles – Partie 2',
+ weapon:'Sidesword & Rotella',css:'rapiere',level:'Intermédiaire+',type:'a',
+ desc:'Deuxième partie de l\'atelier. Matériel : masque, gants. Idéal : + veste, protège-tibias. Recommandé d\'avoir suivi la partie 1.'},
+
+{id:'V11',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'ZC',instructor:'Joachim Bartsch',
+ title:'Le cœur de l\'escrime Messer : au-delà des techniques',
+ weapon:'Messer',css:'messer',level:'Débutant',type:'a',
+ desc:'Ce séminaire vise à maîtriser les principes fondamentaux du Messer : jeu de jambes, positionnement spatial, équilibre, timing et l\'Indes. Déconstruction du Messer pour révéler pourquoi une technique fonctionne et à quel moment l\'appliquer. Le rôle de la main secondaire, les enchaînements (Stücke) et le Fühlen seront au centre de l\'atelier. Matériel : masque, gants, messer recommandés.'},
+
+{id:'V12',day:'vendredi',slot:'V2',time:'11h00–12h55',room:'ZD',instructor:'Jeff Tsay',
+ title:'Frequens Motus : un outil d\'entraînement universel',
+ weapon:'Épée longue',css:'el',level:'Intermédiaire',type:'a',
+ desc:'Développer ses capacités d\'entraînement pour améliorer et intégrer progressivement les techniques dans la pratique de l\'escrime. Bon complément à l\'atelier Krumphau, mais indépendant. Matériel : épée longue, masque, gants.'},
+
+{id:'V13',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'SM',instructor:'Karin Verelst',
+ title:'CONFÉRENCE – Préserver le patrimoine en collaboration avec les grands musées',
+ weapon:'Conférence',css:'',level:'Tous',type:'c',
+ desc:'1) Rôle potentiel des groupes AMHE dans la préservation professionnelle du patrimoine culturel géré par les musées. 2) Étude de cas : collaboration entre HSK De Vagant / Via Bruxellensis et le Musée royal de l\'Armée de Belgique (War Heritage Institute).'},
+
+{id:'V14',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'SC',instructor:'Joachim Bartsch',
+ title:'Parfois l\'important n\'est pas de toucher, mais de mettre fin au combat',
+ weapon:'Messer',css:'messer',level:'Intermédiaire+',type:'a',
+ desc:'Projections, clés et leviers pour mettre fin aux combats sans effusion de sang. Réduction de la distance, amenés au sol contrôlés, neutralisation de l\'adversaire en combat rapproché. Techniques de combat au couteau où la distance se réduit. Recommandé de suivre la partie 1 d\'abord. Matériel : masque, gants, messer recommandés.'},
+
+{id:'V15',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'ZA',instructor:'Anne-Charlotte Misto',
+ title:'Se défendre dans la rue face aux Apaches',
+ weapon:'Canne de défense',css:'canne',level:'Débutant',type:'a',
+ desc:'Canne de défense dans les rues de Paris au début du XXe siècle selon Jean-Joseph Renaud. Posture, distance, frappes, ripostes. Scénarios concrets : duel, agression au couteau, attaque en groupe. Matériel : 1re partie : masque, gants légers. 2e partie : masque, gants Red Dragon, veste.'},
+
+{id:'V16',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'ZB',instructor:'Sébastien Romagnan',
+ title:'Le système des atajos chez Francisco de Rada',
+ weapon:'Rapière (Destreza)',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Évolution de Pacheco (un atajo) à Rada (une multitude). Les huit principaux atajos présents chez Rada. Matériel : masque, gants, veste rapière.'},
+
+{id:'V17',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'ZC',instructor:'Bert Gevaert',
+ title:'L\'escrime sous les ailes de Saint-Michel (max 24 pers.)',
+ weapon:'Épée (guilde)',css:'el',level:'Débutant',type:'a',
+ desc:'Principes de l\'escrime dans la guilde Saint-Michel à Bruges (15e–18e siècle). Participation à un tournoi selon les règles de la guilde avec répliques historiques exactes de schoolzwaarden. Atelier en anglais (instructions en français disponibles). MAXIMUM 24 PARTICIPANTS. Matériel : masque d\'escrime et épée.'},
+
+{id:'V18',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'ZD',instructor:'Julien Wattez',
+ title:'Singlestick, le couteau suisse des AMHE ?',
+ weapon:'Singlestick',css:'canne',level:'Débutant',type:'a',
+ desc:'(Re)découverte du singlestick : accessible, pédagogique, dynamique. Présentation de la discipline + fabrication DIY, initiation progressive, puis sparring. Distance, tempo, intention, angles d\'attaque, déplacements. Matériel : masque, gants, coquille, protège-coudes. Pantalon d\'escrime optionnel.'},
+
+{id:'V19',day:'vendredi',slot:'V3',time:'14h20–15h45',room:'ZF',instructor:'Régis Harter',
+ title:'Duel asymétrique en Gaulois : épée vs lance avec bouclier',
+ weapon:'Gaulois',css:'gaulois',level:'Débutant',type:'a',
+ desc:'Opposition asymétrique entre épéiste et lancier gaulois avec bouclier. Techniques pour exploiter l\'allonge de la lance et pour casser la distance adverse. Matériel : ~25 boucliers et lances fournis. Inscription sur liste. Masque, gant, épée recommandés.'},
+
+{id:'V20',day:'vendredi',slot:'V4',time:'16h00–17h30',room:'SC',instructor:'Özgen « Ozzy » Senol',
+ title:'TIKF – L\'estoc / le coup de poignard est la mort de la coupure',
+ weapon:'Couteau italien',css:'couteau',level:'Débutant',type:'a',
+ desc:'Exploration de la tradition singulière de l\'escrime au couteau du XIXe siècle en Apulie et en Sicile. Positions et tactiques à moyenne et longue distance, déplacement circulaire. Parallèles entre couteau et bâton de berger abordés si le temps le permet.'},
+
+{id:'V21',day:'vendredi',slot:'V4',time:'16h00–17h30',room:'ZA',instructor:'Olivier Dupuis',
+ title:'Variations autour du bâton à deux bouts en version réduite',
+ weapon:'Bâton',css:'baton',level:'Débutant',type:'a',
+ desc:'Exploration de techniques de P.H. Mair autour du petit bâton, extrapolation en situation d\'assaut contrôlé. Matériel : gants, masque, bâtons ~1,20 à 1,60 m.'},
+
+{id:'V22',day:'vendredi',slot:'V4',time:'16h00–17h30',room:'ZB',instructor:'Sam Pearson',
+ title:'Longsword stratégique',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Dépasser la première intention dans la tradition Liechtenauer. Analyser les schémas qui se dessinent dans l\'escrime, anticiper la riposte adverse, exploiter ses faiblesses. Contre-attaques et parades après la première attaque. Matériel : masque, protège-cou, gants. Équipement complet recommandé.'},
+
+{id:'V23',day:'vendredi',slot:'V4',time:'16h00–17h30',room:'ZC',instructor:'Rob Runacres',
+ title:'Épée et poignard – Livre des leçons & Girolamo Cavalcabo',
+ weapon:'Rapière & Dague',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Une introduction aux formes d\'épées et de poignards populaires dans le royaume de France à la fin du XVIe et au début du XVIIe siècle. Matériel : équipement complet, rapière et dague.'},
+
+{id:'V24',day:'vendredi',slot:'V4',time:'16h00–17h30',room:'ZD',instructor:'Jordan Mock',
+ title:'Il ne m\'est d\'aucune utilité s\'il est mort ! – Faire prisonnier',
+ weapon:'Épée longue',css:'el',level:'Intermédiaire',type:'a',
+ desc:'Méthodes pour faire prisonnier sur le champ de bataille. Jeux de scénario pour développer le QI de combat et les techniques de capture. Matériel : masque, gants, gorgerin, veste.'},
+
+// ══ SAMEDI 16 MAI ══
+
+{id:'S01',day:'samedi',slot:'S1',time:'9h10–10h55',room:'SC',instructor:'Godefroy Lafayolle de la Bruyère',
+ title:'Découverte de la Boxe de Charlemont',
+ weapon:'Boxe française',css:'boxe',level:'Débutant',type:'a',
+ desc:'Découverte de la boxe française selon la méthode de Joseph Charlemont (1899). Exploration de son intérêt proprioceptif et de ses possibilités comme échauffement. Matériel : gants et protège-dents si assaut.'},
+
+{id:'S02',day:'samedi',slot:'S1',time:'9h10–10h55',room:'ZA',instructor:'Mark West',
+ title:'Dégriffage du chat',
+ weapon:'Sabre & Coutelas',css:'sabre',level:'Débutant',type:'a',
+ desc:'Exploiter les faiblesses des parades intérieures et s\'en protéger. Exercices, séquences et jeux pour développer la maîtrise du jeu de parade-riposte. Excellent préparatoire au Skirmish (Muster). Matériel : coutelas/sabre, gants, protège-bras, veste, masque.'},
+
+{id:'S03',day:'samedi',slot:'S1',time:'9h10–10h55',room:'ZB',instructor:'Marc Dekker',
+ title:'Une étude sur la bonkomancy (grand bâton paysan)',
+ weapon:'Bâton',css:'baton',level:'Débutant',type:'a',
+ desc:'Manier le bâton paysan (~1,5m, 10cm de diamètre) avec fluidité et en révéler les subtilités. Matériel : armes d\'entraînement rembourrées fournies.'},
+
+{id:'S04',day:'samedi',slot:'S1',time:'9h10–10h55',room:'ZC',instructor:'Emilien Sivry',
+ title:'Les feintes dans le Zufechten de Lecküchner',
+ weapon:'Messer',css:'messer',level:'Débutant',type:'a',
+ desc:'Dans le Zufechten, feintes pour terminer rapidement un combat (opposition pour la vie, non pour le sport). 5–6 pièces de Lecküchner pour prendre de court l\'adversaire. Matériel : un Messer et un masque.'},
+
+{id:'S05',day:'samedi',slot:'S1',time:'9h10–10h55',room:'ZD',instructor:'Jonathan Hily',
+ title:'Meyer 1561, les coups fourbes à l\'épée longue',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Die 6 verborgennhaw : Blindhaw, Brelchaw, Kurtzhaw, Knichellhaw, Glietzhaw & Windthaw. Les 6 coups secrets du traité de 1561 de Joachim Meyer, pour passer ou contourner la défense adverse. Matériel : épée longue (Feder), masque, gants.'},
+
+{id:'S06',day:'samedi',slot:'S2',time:'11h00–12h55',room:'SM',instructor:'Olivier Dupuis',
+ title:'CONFÉRENCE – La Fresnay, maître d\'arme au 17e siècle',
+ weapon:'Conférence',css:'',level:'Tous',type:'c',
+ desc:'Le maître d\'arme parisien La Fresnay, ses deux traités d\'escrime manuscrits, et leur intégration dans la culture de l\'escrime en France et en Europe au 17e siècle.'},
+
+{id:'S07',day:'samedi',slot:'S2',time:'11h00–12h55',room:'SC',instructor:'Lise Gijbels',
+ title:'La musique et la danse dans la salle d\'escrime',
+ weapon:'Multi armes',css:'multi',level:'Débutant',type:'a',
+ desc:'Danse et escrime selon Thoinot Arbeau (1589). Première partie : danse des épées de la cour française. Deuxième partie : ce que la musique peut apporter à l\'art du combat moderne. Matériel : n\'importe quelle arme + bâton ou arme légère à une main.'},
+
+{id:'S08',day:'samedi',slot:'S2',time:'11h00–12h55',room:'ZA',instructor:'Filipe Martins',
+ title:'Épée, dague et rodela à la manière de Godinho',
+ weapon:'Rapière & Rotella',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Exploration des techniques communes avec épée et armes secondaires (rodela, dague) selon l\'Arte de Esgrima de Godinho. Matériel : rapière ou sidesword, dague de parade et/ou rotella ; protection complète recommandée.'},
+
+{id:'S09',day:'samedi',slot:'S2',time:'11h00–12h55',room:'ZB',instructor:'Rui Ferreira',
+ title:'Le Glizade, plus qu\'un simple rythme',
+ weapon:'Épée de cour',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Qu\'est-ce qu\'un Glizade ? Étude dans le contexte de l\'École d\'escrime de Domenico Angelo. Différences avec un simple coup, autres interprétations, désarmement spectaculaire. Matériel : veste légère, gants, masque, épée de cour, plastron.'},
+
+{id:'S10',day:'samedi',slot:'S2',time:'11h00–12h55',room:'ZC',instructor:'Arturo Medina Garcia',
+ title:'L\'art du combat à deux épées – Partie 1',
+ weapon:'Multi armes',css:'multi',level:'Débutant',type:'a',
+ desc:'Bases solides du maniement de deux épées en s\'appuyant sur Marozzo, Agrippa, Monte, Godinho, Macholino, etc. Contexte historique, gardes et postures, actions offensives et défensives. Inspiré par 10+ sources historiques AMHE. Matériel : paire d\'épées à une main (~100 cm chacune), masque. Idéal : + gants, plastron, veste.'},
+
+{id:'S11',day:'samedi',slot:'S2',time:'11h00–12h55',room:'ZD',instructor:'Tobias Hyder',
+ title:'Raccourcis du tranchant court : de Ringeck à Meyer',
+ weapon:'Épée longue',css:'el',level:'Intermédiaire',type:'a',
+ desc:'Exploration du tranchant court à travers le manuscrit de Dresde et les détails de Meyer. Parallèles dans la tradition de Liechtenauer. Vraie croix, contres circulaires (Verversen), fenêtres d\'interception. Matériel : masque et gants minimum. Idéal : + gorgerin, plastron, veste.'},
+
+{id:'S12',day:'samedi',slot:'S2',time:'11h00–12h55',room:'ZF',instructor:'Gabriel Tardio',
+ title:'Quatre gardes pour les gouverner tous, et dans le fer les lier',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Structure et principe du Hangen (MS 3227a et Ringeck). Meilleure défense tout en menaçant l\'adversaire, depuis la longue à la moyenne distance. Ochs, Pflug, Absetzen, Ansetzen, Winden, Durchwelsen, Zucken, Abnemen. Matériel : masque, gants, épée longue, plastron ou veste.'},
+
+{id:'S13',day:'samedi',slot:'S3',time:'14h20–15h25',room:'SC',instructor:'Kindred Willow',
+ title:'Perfectionnez vos mouvements de lame',
+ weapon:'Sabre / Broadsword',css:'sabre',level:'Intermédiaire+',type:'a',
+ desc:'Glissades, coups, gardes et mouvements de lame issus de l\'escrime du XVIIIe siècle. Approfondissement technique et application en combat. Matériel : équipement complet et armes en acier obligatoires.'},
+
+{id:'S14',day:'samedi',slot:'S3',time:'14h20–15h25',room:'ZB',instructor:'Karl Rapp',
+ title:'Tir à l\'arc et tir à l\'arc de guerre dans les AMHE',
+ weapon:'Arc',css:'arc',level:'Débutant',type:'a',
+ desc:'Histoire du tir à l\'arc, différences entre tir sportif olympique, traditionnel et de guerre. Types d\'arcs expliqués. Essai de différents types d\'arcs (nombre de participants limité). Matériel : fourni.'},
+
+{id:'S15',day:'samedi',slot:'S3',time:'14h20–15h25',room:'ZC',instructor:'Arturo Medina Garcia',
+ title:'L\'art du combat à deux épées – Partie 2',
+ weapon:'Multi armes',css:'multi',level:'Débutant',type:'a',
+ desc:'Approfondissement : techniques offensives et défensives avancées, combat contre plusieurs adversaires (1v2, 1v3), techniques de dégagement, exercice de garde du corps, jeux de guerre. Suite directe de la partie 1. Matériel : même équipement que la partie 1.'},
+
+{id:'S16',day:'samedi',slot:'S3',time:'14h20–15h25',room:'ZD',instructor:'Ken Renaud Dietiker',
+ title:'Les secrets de la Fleur de Bataille (Fiore)',
+ weapon:'Épée longue & Dague',css:'el',level:'Débutant',type:'a',
+ desc:'Démystifier La Fleur de Bataille de Fiore dei Liberi : révéler la mine de données techniques cachées à la vue de tous, accessibles seulement aux initiés. Matériel : dague de type rondel, épée longue. Optionnel : arme d\'hast, épée courte.'},
+
+{id:'S17',day:'samedi',slot:'S3',time:'14h20–15h25',room:'ZG',instructor:'Julien Vuagniaux',
+ title:'La Dague en mouvement – sparrings en armure',
+ weapon:'Dague (armure)',css:'dague',level:'Débutant',type:'a',
+ desc:'Utilisation sécurisée des techniques de dague en armure, mise en pratique en mouvement. Matériel : armure recommandée, dague ; faisable en matériel lourd.'},
+
+{id:'S18',day:'samedi',slot:'S4',time:'15h30–18h15',room:'SC',instructor:'Yann Schmitt',
+ title:'Fühle-toi toi-même (atelier-conférence)',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Expérimenter la notion de Fühlen de Liechtenauer à travers une explication théorique des concepts de proprioception, d\'intéroception et de neuroception, suivie d\'une mise en application pratique. Matériel : épée longue.'},
+
+{id:'S19',day:'samedi',slot:'S4',time:'15h30–18h15',room:'ZA',instructor:'Mark West',
+ title:'🏆 Le deuxième Muster de Dijon ! (Skirmish en équipes)',
+ weapon:'Sabre / Coutelas',css:'sabre',level:'Intermédiaire+',type:'a',
+ desc:'Tournoi Skirmish en équipes de 5. Combat à l\'épée amusant, rapide et intense sous forme de duel ritualisé, inspiré du duel au sabre classique, de la canne de combat et des manuscrits historiques. Format tie-break. Inscription requise : équipe de 5 personnes avec un nom d\'équipe. Matériel : coutelas/sabre, gants, protège-bras, veste, masque.'},
+
+{id:'S20',day:'samedi',slot:'S4',time:'15h30–18h15',room:'ZB',instructor:'Aurélien Nouvion & Marine Beaumel',
+ title:'Sacerdos ligavit – Le liage en position inférieure (I.33)',
+ weapon:'Épée & Bocle',css:'bocle',level:'Débutant',type:'a',
+ desc:'Exploration de la situation du liage inférieur (I.33). Clefs biomécaniques et techniques pour tirer le meilleur de cette position délicate. Articulation corps et pièces du manuscrit. Matériel : épée, bocle, masque, gants fins, coquille. Optionnel : plastron, veste AMHE.'},
+
+{id:'S21',day:'samedi',slot:'S4',time:'15h30–18h15',room:'ZC',instructor:'Mike Prendergast',
+ title:'Guards! Guard! – Les Custodia de l\'Épée de Pietro Monte',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Gardes principales de Pietro Monte, stratégies défensives dans ses gardes, comment les réparer ou les briser, enchaînements. Monte fait le lien entre épée longue et grande épée à deux mains. Matériel : masque + épée longue minimum. Idéal : équipement complet.'},
+
+{id:'S22',day:'samedi',slot:'S4',time:'15h30–18h15',room:'ZD',instructor:'Michel Rensen',
+ title:'La meilleure façon de parer, c\'est de ne pas parer du tout',
+ weapon:'Rapière (Fabris)',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Selon Fabris, ne jamais parer si on peut l\'éviter. Pourquoi ? Et que faire à la place ? Différentes façons de gérer les attaques avec plus de contrôle qu\'une simple parade. Matériel : rapière, masque, gorgerin, cuirasse. Optionnel : veste et gants légers.'},
+
+// ══ DIMANCHE 17 MAI ══
+
+{id:'D01',day:'dimanche',slot:'D1',time:'10h30–12h15',room:'SC',instructor:'Jerca Primc',
+ title:'La canne de marche dans le Bartitsu',
+ weapon:'Canne (Bartitsu)',css:'canne',level:'Débutant',type:'a',
+ desc:'Bartitsu : méthode de combat pour les rues de Londres du XIXe siècle. Étude de la canne de marche comme arme de ce système original. Matériel : canne, masque, gants.'},
+
+{id:'D02',day:'dimanche',slot:'D1',time:'10h30–12h15',room:'ZA',instructor:'Godefroy Lafayolle de la Bruyère',
+ title:'Assauts thématiques à la rapière',
+ weapon:'Rapière',css:'rapiere',level:'Débutant',type:'a',
+ desc:'Série d\'assauts thématiques pour mettre en pratique les concepts techniques issus des sources. Assauts aux chapeaux proposés. Matériel : veste, gants, masque.'},
+
+{id:'D03',day:'dimanche',slot:'D1',time:'10h30–12h15',room:'ZB',instructor:'Gabriel Tardio',
+ title:'Du temps vers l\'espace – Vor / Nach / Indes',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Vor, Nach, Indes – exercices concrets pour améliorer la prise d\'initiative (Vor), mieux accepter d\'être en retard (Nach) et saisir les opportunités (Indes). Sources : Danzig, Ringeck, Dobringer. Matériel : masque, gants, veste, épée longue. Équipements "Light" et "Full" acceptés.'},
+
+{id:'D04',day:'dimanche',slot:'D1',time:'10h30–12h15',room:'ZC',instructor:'Mathieu Tondut & Marine Beaumel',
+ title:'Se battre avec une casquette et un couteau',
+ weapon:'Couteau',css:'couteau',level:'Débutant',type:'a',
+ desc:'Style de duel au couteau utilisant une casquette pour protéger une main. Sources : Manual del Baratero (1849) et 100 Façons de se défendre dans la rue (Émile André, 1905). Matériel : simulateur de couteau/dague (prêt disponible). Idéal : masque et gants.'},
+
+{id:'D05',day:'dimanche',slot:'D1',time:'10h30–12h15',room:'ZD',instructor:'Jack Gassmann',
+ title:'Savoir être faible',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Utiliser les techniques d\'affaiblissement (schwach) dans le cadre d\'une prise pour obtenir les réponses les plus efficaces. Contrer la force par la faiblesse et la faiblesse par la force. Matériel : masque, gants, gorgerin minimum.'},
+
+{id:'D06',day:'dimanche',slot:'D2',time:'14h00–15h45',room:'SC',instructor:'Kindred Willow',
+ title:'Martin Huntsfeld – Dague du XVe siècle',
+ weapon:'Dague',css:'dague',level:'Débutant',type:'a',
+ desc:'Techniques de combat au poignard issues de l\'Allemagne du XVe siècle, avec focus sur les prises et projections de Martin Huntsfeld. Matériel : dague, masque.'},
+
+{id:'D07',day:'dimanche',slot:'D2',time:'14h00–15h45',room:'ZA',instructor:'Karl Rapp',
+ title:'Une approche tactique de la Rapière / Capoferro',
+ weapon:'Rapière',css:'rapiere',level:'Intermédiaire',type:'a',
+ desc:'Construction sensée d\'un combat à la rapière d\'un point de vue tactique selon Capoferro (+ Alfieri, Dancie). Limiter les options adverses en restant en sécurité tout en restant prêt à s\'adapter. Matériel : masque, veste, coquille minimum. Équipement complet recommandé.'},
+
+{id:'D08',day:'dimanche',slot:'D2',time:'14h00–15h45',room:'ZB',instructor:'Nicolas « Vabo » Ferrand',
+ title:'Épée longue germanique selon Hans Medl – Le coup tordu, la garde tordue, l\'esprit tordu',
+ weapon:'Épée longue',css:'el',level:'Débutant',type:'a',
+ desc:'Rotations du corps et placements de pieds contre-intuitifs pour embellir le jeu de l\'épée longue. Ça frappe fort et c\'est ultra stylé. Matériel : masque et gants minimum. Optionnel : veste et couvre-masque.'},
+
+{id:'D09',day:'dimanche',slot:'D2',time:'14h00–15h45',room:'ZC',instructor:'Martin Enzi',
+ title:'Utilisons le dos du Messer',
+ weapon:'Messer',css:'messer',level:'Débutant',type:'a',
+ desc:'Pommeau, clou, prise, parade du Messer : effets mortels au-delà de la lame. Comment pratiquer ces techniques en toute sécurité sans détruire les articulations du partenaire. Matériel : masque.'},
+
+{id:'D10',day:'dimanche',slot:'D2',time:'14h00–15h45',room:'ZD',instructor:'Jack Gassmann',
+ title:'Se défendre contre un assassin médiéval',
+ weapon:'Dague (Fiore)',css:'dague',level:'Débutant',type:'a',
+ desc:'L\'assassinat comme menace constante pour les élèves de Fiore. Jeux de scénario pour explorer ses techniques et son état d\'esprit face au couteau et aux armes improvisées. Matériel : masque, protection gorge. Gants légers et veste recommandés.'},
+];
+
+// ─── SCHEDULE CONFIG ─────────────────────────────────────────────────────────
+const PX_PER_HOUR = 80;
+const PX_PER_MIN  = PX_PER_HOUR / 60;
+
+const DAY_CONFIG = {
+  jeudi:    {startH: 8,  endH: 21},
+  vendredi: {startH: 8,  endH: 19},
+  samedi:   {startH: 8,  endH: 20},
+  dimanche: {startH: 9,  endH: 18},
+};
+
+const DAYS = {
+  jeudi: {
+    label: 'Jeudi 14 mai',
+    rooms: ['SM','SC','ZA','ZB','ZC','ZD','ZE','ZF','ZG'],
+    slots: [
+      {id:'J0', time:'10h30–12h15'},
+      {id:'J1', time:'14h15–16h00'},
+      {id:'J2', time:'16h15–18h00'},
+    ],
+    notices: [
+      {time:'8h00–10h15',  text:'Accueil · soyez là !', cls:'normal'},
+      {time:'10h15–10h25', text:'Annonce', cls:'normal'},
+      {time:'12h15–13h45', text:'🍽 Pause de Midi', cls:'meal'},
+      {time:'13h45–14h00', text:'Rendez-vous pour départ Table ronde', cls:'normal'},
+      {time:'18h30–20h30', text:'🍻 Pot ! (Devant la Salle de Combat)', cls:'special'},
+    ]
+  },
+  vendredi: {
+    label: 'Vendredi 15 mai',
+    rooms: ['SM','SC','ZA','ZB','ZC','ZD','ZE','ZF','ZG'],
+    slots: [
+      {id:'V1', time:'9h30–10h55'},
+      {id:'V2', time:'11h00–12h55'},
+      {id:'V3', time:'14h20–15h45'},
+      {id:'V4', time:'16h00–17h30'},
+    ],
+    notices: [
+      {time:'8h30–9h30',   text:'Accueil · soyez là !', cls:'normal'},
+      {time:'12h55–14h10', text:'🍽 Pause de Midi', cls:'meal'},
+      {time:'14h10–14h20', text:'Annonce', cls:'normal'},
+      {time:'18h30–19h00', text:'Salles fermées – Récupérez vos affaires !', cls:'normal'},
+    ]
+  },
+  samedi: {
+    label: 'Samedi 16 mai',
+    rooms: ['SM','SC','ZA','ZB','ZC','ZD','ZE','ZF','ZG'],
+    slots: [
+      {id:'S1', time:'9h10–10h55'},
+      {id:'S2', time:'11h00–12h55'},
+      {id:'S3', time:'14h20–15h25'},
+      {id:'S4', time:'15h30–18h15'},
+    ],
+    notices: [
+      {time:'8h30–9h10',   text:'Accueil · soyez là !', cls:'normal'},
+      {time:'12h55–14h00', text:'🍽 Pause de Midi', cls:'meal'},
+      {time:'14h00–14h20', text:'Annonce', cls:'normal'},
+      {time:'18h30–19h20', text:'🎤 Heure des instructeurs (Salle des sports)', cls:'special'},
+    ]
+  },
+  dimanche: {
+    label: 'Dimanche 17 mai',
+    rooms: ['SM','SC','ZA','ZB','ZC','ZD','ZE','ZF','ZG'],
+    slots: [
+      {id:'D1', time:'10h30–12h15'},
+      {id:'D2', time:'14h00–15h45'},
+    ],
+    notices: [
+      {time:'10h00–10h30', text:'Accueil · soyez là !', cls:'normal'},
+      {time:'12h15–13h55', text:'🍽 Pause de Midi', cls:'meal'},
+      {time:'15h50–16h00', text:'Annonce', cls:'normal'},
+      {time:'16h00–17h00', text:'Free Sparring (toutes zones)', cls:'normal'},
+      {time:'17h00–17h30', text:'🏁 Fermeture', cls:'special'},
+    ]
+  }
+};
+
+const ROOM_NAMES = {
+  SM:'Salle Multiplex', SC:'Salle de Combat',
+  ZA:'Zone A · Halle des Sports', ZB:'Zone B · Halle des Sports',
+  ZC:'Zone C · Salle Sports Co',  ZD:'Zone D · Salle Sports Co',
+  ZE:'Zone E · Salle Sports Co',  ZF:'Zone F · Extérieur SC',
+  ZG:'Zone G · Extérieur',
+};
+
+const WEAPON_COLORS = {
+  'el':{bg:'#1e3a5f',label:'Épée longue'}, 'rapiere':{bg:'#2d1b69',label:'Rapière / Sidesword'},
+  'messer':{bg:'#450a0a',label:'Messer'}, 'sabre':{bg:'#451a03',label:'Sabre / Spadroon'},
+  'lutte':{bg:'#052e16',label:'Lutte'}, 'baton':{bg:'#2a2a04',label:'Bâton / Hast'},
+  'couteau':{bg:'#3b1c08',label:'Couteau / Tomahawk'}, 'bocle':{bg:'#0c2340',label:'Épée & Bocle'},
+  'multi':{bg:'#1e1b4b',label:'Multi armes'}, 'gaulois':{bg:'#3b2108',label:'Combat gaulois'},
+  'boxe':{bg:'#3b0764',label:'Boxe française'}, 'dague':{bg:'#0f2a4a',label:'Dague'},
+  'faucille':{bg:'#04261b',label:'Faucille'}, 'faux':{bg:'#042d1a',label:'Faux'},
+  'arc':{bg:'#1a3209',label:'Arc'}, 'canne':{bg:'#2d2006',label:'Canne / Singlestick'},
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const selected = {};
+let currentDay = 'jeudi';
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function parseMin(s) {
+  const m = s.match(/(\d+)h(\d*)/);
+  return m ? parseInt(m[1]) * 60 + parseInt(m[2] || 0) : 0;
+}
+function parseRange(s) {
+  const p = s.split(/\s*[–\-]+\s*/);
+  const start = parseMin(p[0]);
+  const end   = p[1] ? parseMin(p[1]) : start + 90;
+  return {start, end, dur: end - start};
+}
+function toPx(min, dayStartMin) {
+  return (min - dayStartMin) * PX_PER_MIN;
+}
+function roomToCol(room) {
+  return room.split(/[\s–]/)[0].trim();
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderAll() {
+  const schedule = document.getElementById('schedule');
+  schedule.innerHTML = Object.entries(DAYS).map(([dayKey, day]) => {
+    const cfg = DAY_CONFIG[dayKey];
+    const dayStartMin = cfg.startH * 60;
+    const totalH = (cfg.endH - cfg.startH) * PX_PER_HOUR;
+    const rooms = day.rooms;
+    const workshops = WORKSHOPS.filter(w => w.day === dayKey);
+
+    // Time gutter ticks
+    let ticks = '';
+    for (let h = cfg.startH; h <= cfg.endH; h++) {
+      const top = toPx(h * 60, dayStartMin);
+      ticks += `<div class="tick" style="top:${top}px">${h}h</div>`;
+    }
+
+    // Hour grid lines (every 30 min)
+    let hlines = '';
+    for (let m = cfg.startH * 60; m <= cfg.endH * 60; m += 30) {
+      const top = toPx(m, dayStartMin);
+      const bold = m % 60 === 0 ? ' bold' : '';
+      hlines += `<div class="hline${bold}" style="top:${top}px"></div>`;
+    }
+
+    // Notice bands
+    let bands = '';
+    day.notices.forEach(n => {
+      const {start, end, dur} = parseRange(n.time);
+      const top = toPx(start, dayStartMin);
+      const h = Math.max(20, dur * PX_PER_MIN);
+      bands += `<div class="nband ${n.cls}" style="top:${top}px;height:${h}px">
+        <span class="nt">${n.time}</span>${n.text}
+      </div>`;
+    });
+
+    // Room columns
+    let roomCols = '';
+    rooms.forEach(r => {
+      const colWs = workshops.filter(w => roomToCol(w.room) === r);
+      let blocks = '';
+
+      // Free sparring filler for ZE/ZF/ZG when no workshop in that slot
+      if (['ZE','ZF','ZG'].includes(r)) {
+        day.slots.forEach(slot => {
+          if (colWs.some(w => w.slot === slot.id)) return;
+          const {start, end, dur} = parseRange(slot.time);
+          const top = toPx(start, dayStartMin);
+          const h = dur * PX_PER_MIN;
+          blocks += `<div class="eblock sparring" style="top:${top}px;height:${h}px">
+            <span class="sp-i">⚔</span>
+            <span class="sp-l">Free Sparring</span>
+          </div>`;
+        });
+      }
+
+      // Workshop blocks
+      colWs.forEach(w => {
+        const {start, end, dur} = parseRange(w.time);
+        const top = toPx(start, dayStartMin);
+        const h = Math.max(44, dur * PX_PER_MIN);
+
+        if (w.type === 'c') {
+          blocks += `<div class="eblock conf" style="top:${top}px;height:${h}px">
+            <div class="cb-badge">CONF.</div>
+            <div class="cb-ttl">${w.title.replace('CONFÉRENCE – ','')}</div>
+            <div class="cb-sub">${w.instructor}</div>
+          </div>`;
+          return;
+        }
+
+        const sel = selected[w.id] ? 'selected' : '';
+        const cfl = isConflict(w) ? 'conflict' : '';
+        blocks += `<div class="eblock card ${w.css} ${sel} ${cfl}"
+          data-id="${w.id}" data-desc="${w.desc}"
+          style="top:${top}px;height:${h}px"
+          onclick="toggle('${w.id}')">
+          <div class="card-inner">
+            <div class="c-instr">${w.instructor}</div>
+            <div class="c-ttl">${w.title}</div>
+            <div class="c-tags">
+              <span class="weapon-tag">${w.weapon}</span>
+              <span class="lvl-tag">${w.level}</span>
+            </div>
+          </div>
+          <div class="badge">✓</div>
+          <button class="detail-btn" onclick="event.stopPropagation();openDetail('${w.id}')">détail</button>
+        </div>`;
+      });
+
+      roomCols += `<div class="room-col">${blocks}</div>`;
+    });
+
+    // Room headers
+    const headersHtml = rooms.map(r =>
+      `<div class="ah-room">${ROOM_NAMES[r] || r}</div>`
+    ).join('');
+
+    return `<div id="day-${dayKey}" class="day${dayKey===currentDay?' active':''}">
+      <div class="agenda-header">
+        <div class="ah-gutter"></div>
+        <div class="ah-rooms">${headersHtml}</div>
+      </div>
+      <div class="agenda-body">
+        <div class="time-gutter" style="height:${totalH}px">${ticks}</div>
+        <div class="cols-area" style="height:${totalH}px">
+          <div class="hlines">${hlines}</div>
+          ${bands}
+          <div class="room-cols" style="position:absolute;inset:0;display:flex">${roomCols}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderLegend();
+  renderSidebar();
+  applyFilters();
+}
+
+function renderLegend() {
+  const used = [...new Set(WORKSHOPS.filter(w=>w.css).map(w=>w.css))];
+  document.getElementById('legend').innerHTML = used.map(css => {
+    const c = WEAPON_COLORS[css]; if (!c) return '';
+    return `<div class="leg-item"><div class="leg-dot" style="background:${c.bg}"></div>${c.label}</div>`;
+  }).join('');
+}
+
+// ─── LOGIC ───────────────────────────────────────────────────────────────────
+function isConflict(w) {
+  return Object.values(selected).some(s => s.id !== w.id && s.day === w.day && s.slot === w.slot);
+}
+
+function toggle(id) {
+  const w = WORKSHOPS.find(x => x.id === id);
+  if (!w) return;
+  if (selected[id]) delete selected[id]; else selected[id] = w;
+  renderAll();
+  showDay(currentDay);
+}
+
+function showDay(day) {
+  currentDay = day;
+  document.querySelectorAll('.day').forEach(d => d.classList.remove('active'));
+  const el = document.getElementById('day-' + day);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', ['jeudi','vendredi','samedi','dimanche'][i] === day));
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const list = document.getElementById('sel-list');
+  const count = document.getElementById('sel-count');
+  const items = Object.values(selected);
+  count.textContent = items.length + ' atelier(s) sélectionné(s)';
+  if (!items.length) { list.innerHTML = '<li class="empty-msg">Clique sur un atelier pour l\'ajouter</li>'; return; }
+  const dayOrder = {jeudi:0,vendredi:1,samedi:2,dimanche:3};
+  items.sort((a,b) => dayOrder[a.day]-dayOrder[b.day] || a.slot.localeCompare(b.slot));
+  const slotConf = {};
+  items.forEach(w => { const k=w.day+'|'+w.slot; slotConf[k]=(slotConf[k]||0)+1; });
+  list.innerHTML = items.map(w => {
+    const k=w.day+'|'+w.slot, hasCfl=slotConf[k]>1;
+    const dl = {jeudi:'Jeu 14',vendredi:'Ven 15',samedi:'Sam 16',dimanche:'Dim 17'}[w.day];
+    return `<li class="sel-item${hasCfl?' conflict-item':''}">
+      <div class="si-day">${dl} mai</div>
+      <div class="si-time">⏰ ${w.time}</div>
+      <div class="si-name">${w.title}</div>
+      <div class="si-instr">👤 ${w.instructor}</div>
+      ${hasCfl?'<div class="conflict-warn">⚠ Conflit horaire !</div>':''}
+    </li>`;
+  }).join('');
+  document.querySelectorAll('.eblock.card').forEach(card => {
+    const id = card.dataset.id;
+    if (!id) return;
+    const w = WORKSHOPS.find(x => x.id === id);
+    if (w) card.classList.toggle('conflict', !!selected[id] && isConflict(w));
+  });
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────────────────
+let modalWorkshopId = null;
+
+function openDetail(id) {
+  const w = WORKSHOPS.find(x => x.id === id);
+  if (!w) return;
+  modalWorkshopId = id;
+
+  // Split desc into description and equipment (after "Matériel :")
+  const matIdx = w.desc.indexOf('Matériel');
+  const descText   = matIdx > -1 ? w.desc.slice(0, matIdx).trim() : w.desc;
+  const equipText  = matIdx > -1 ? w.desc.slice(matIdx) : '';
+
+  document.getElementById('m-weapon').textContent = w.weapon;
+  document.getElementById('m-title').textContent  = w.title;
+  document.getElementById('m-instr').textContent  = '👤 ' + w.instructor;
+  document.getElementById('m-room').textContent   = '📍 ' + (ROOM_NAMES[w.room] || w.room);
+  document.getElementById('m-time').textContent   = '⏰ ' + w.time;
+  document.getElementById('m-lvl').textContent    = w.level;
+  document.getElementById('m-desc').textContent   = descText;
+
+  const equipEl = document.getElementById('m-equip') || (() => {
+    const el = document.createElement('div');
+    el.id = 'm-equip'; el.className = 'm-equip';
+    document.getElementById('m-desc').after(el);
+    return el;
+  })();
+  equipEl.innerHTML = equipText ? `<strong>Matériel :</strong> ${equipText.replace(/^Matériel\s*:\s*/,'')}` : '';
+
+  // Colour the weapon tag to match the card
+  const wc = WEAPON_COLORS[w.css];
+  document.getElementById('m-weapon').style.color = wc ? wc.bg.replace('linear-gradient(160deg,','').split(',')[0] : '#94a3b8';
+
+  refreshModalBtn();
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+function refreshModalBtn() {
+  const btn = document.getElementById('m-select-btn');
+  if (!modalWorkshopId) return;
+  const w = WORKSHOPS.find(x => x.id === modalWorkshopId);
+  if (!w || w.type === 'c') { btn.style.display = 'none'; return; }
+  btn.style.display = 'block';
+  if (selected[modalWorkshopId]) {
+    btn.textContent = '✕ Retirer de mon planning';
+    btn.className = 'modal-select remove';
+  } else {
+    btn.textContent = '+ Ajouter à mon planning';
+    btn.className = 'modal-select add';
+  }
+}
+
+function toggleFromModal() {
+  if (!modalWorkshopId) return;
+  toggle(modalWorkshopId);
+  refreshModalBtn();
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-bg')) return;
+  document.getElementById('modal-bg').classList.remove('open');
+  modalWorkshopId = null;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function clearAll() {
+  Object.keys(selected).forEach(k => delete selected[k]);
+  renderAll(); showDay(currentDay);
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function initFilters() {
+  const discSel = document.getElementById('f-discipline');
+  Object.entries(WEAPON_COLORS).forEach(([css, {label}]) => {
+    if (WORKSHOPS.some(w => w.css === css)) {
+      const o = document.createElement('option');
+      o.value = css; o.textContent = label;
+      discSel.appendChild(o);
+    }
+  });
+  const instrList = document.getElementById('instructeur-list');
+  [...new Set(WORKSHOPS.filter(w => w.instructor).map(w => w.instructor))].sort((a,b) => a.split(' ').pop().localeCompare(b.split(' ').pop())).forEach(i => {
+    const o = document.createElement('option');
+    o.value = i;
+    instrList.appendChild(o);
+  });
+}
+
+function applyFilters() {
+  const disc  = document.getElementById('f-discipline').value;
+  const niv   = document.getElementById('f-niveau').value;
+  const instr = document.getElementById('f-instructeur').value;
+
+  ['f-discipline','f-niveau','f-instructeur'].forEach(id => {
+    document.getElementById(id).classList.toggle('active', !!document.getElementById(id).value);
+  });
+
+  let matched = 0;
+  document.querySelectorAll('.eblock.card[data-id]').forEach(card => {
+    const w = WORKSHOPS.find(x => x.id === card.dataset.id);
+    if (!w) return;
+    const ok = (!disc  || w.css === disc) &&
+               (!niv   || w.level === niv) &&
+               (!instr || w.instructor.toLowerCase().includes(instr.toLowerCase()));
+    card.classList.toggle('faded', !ok);
+    if (ok) matched++;
+  });
+
+  const countEl = document.getElementById('f-count');
+  countEl.textContent = (disc || niv || instr)
+    ? `${matched} atelier${matched > 1 ? 's' : ''}`
+    : '';
+}
+
+function resetFilters() {
+  ['f-discipline','f-niveau','f-instructeur'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = ''; el.classList.remove('active');
+  });
+  document.getElementById('f-count').textContent = '';
+  document.querySelectorAll('.eblock.card.faded').forEach(c => c.classList.remove('faded'));
+}
+
+renderAll();
+initFilters();
+</script>
+</body>
+</html>
